@@ -1,0 +1,14 @@
+node_modules/
+.git/
+.github/
+.gitignore
+README.md
+DOCUMENTATION.md
+Makefile
+*.md
+.env
+.env.local
+__pycache__/
+.pytest_cache/
+*.pyc
+.DS_Store

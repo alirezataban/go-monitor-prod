@@ -1,0 +1,28 @@
+# Simpler Dockerfile: build + install playwright chromium in one image
+FROM golang:1.22-bookworm
+
+WORKDIR /app
+
+# Install system deps for Chromium
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+    libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+    libgbm1 libasound2 libpango-1.0-0 libcairo2 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /app/monitor-server ./cmd/server
+
+# Install playwright browser matching the Go module version
+RUN go run github.com/mxschmitt/playwright-go/cmd/playwright@v0.6100.0 install --with-deps chromium
+
+ENV LISTEN_ADDR=:8080
+ENV HEADLESS=true
+ENV DEFAULT_TIMEOUT=30s
+ENV MAX_CONCURRENT=4
+
+EXPOSE 8080
+ENTRYPOINT ["/app/monitor-server"]
