@@ -17,12 +17,17 @@ import (
 )
 
 type MonitorHandler struct {
-	mgr *browser.Manager
-	cfg *config.Config
+	mgr      *browser.Manager
+	cfg      *config.Config
+	registry *collector.Registry
 }
 
 func NewMonitorHandler(mgr *browser.Manager, cfg *config.Config) *MonitorHandler {
-	return &MonitorHandler{mgr: mgr, cfg: cfg}
+	return NewMonitorHandlerWithRegistry(mgr, cfg, collector.DefaultRegistry())
+}
+
+func NewMonitorHandlerWithRegistry(mgr *browser.Manager, cfg *config.Config, registry *collector.Registry) *MonitorHandler {
+	return &MonitorHandler{mgr: mgr, cfg: cfg, registry: registry}
 }
 
 type MonitorRequest struct {
@@ -140,21 +145,11 @@ func (h *MonitorHandler) run(req *MonitorRequest) *report.Report {
 		Timeout:   playwright.Float(float64(timeout.Milliseconds())),
 	})
 	if err != nil {
-		rep.Finish(fmt.Errorf("navigation: %w", err))
+		fatalErr := fmt.Errorf("navigation: %w", err)
 		// still run packages that don't need a successful page load
 		ctx := &collector.Context{Page: page, Response: nil, URL: req.URL, Tracker: tracker}
-		registry := collector.All()
-		for _, name := range req.Collectors {
-			if name == "ssl" || name == "seo" {
-				start := time.Now()
-				col, ok := registry[name]
-				if !ok {
-					continue
-				}
-				data, colErr := col.Collect(ctx)
-				rep.Add(name, colErr == nil, time.Since(start), data, colErr)
-			}
-		}
+		h.collect(rep, ctx, req.Collectors, map[string]bool{"ssl": true, "seo": true})
+		rep.Finish(fatalErr)
 		return rep
 	}
 
@@ -168,10 +163,19 @@ func (h *MonitorHandler) run(req *MonitorRequest) *report.Report {
 		Tracker:  tracker,
 	}
 
-	registry := collector.All()
-	for _, name := range req.Collectors {
+	h.collect(rep, ctx, req.Collectors, nil)
+
+	rep.Finish(nil)
+	return rep
+}
+
+func (h *MonitorHandler) collect(rep *report.Report, ctx *collector.Context, names []string, allowed map[string]bool) {
+	for _, name := range names {
+		if allowed != nil && !allowed[name] {
+			continue
+		}
 		start := time.Now()
-		col, ok := registry[name]
+		col, ok := h.registry.Get(name)
 		if !ok {
 			rep.Add(name, false, 0, nil, fmt.Errorf("unknown package: %s", name))
 			continue
@@ -179,9 +183,6 @@ func (h *MonitorHandler) run(req *MonitorRequest) *report.Report {
 		data, colErr := col.Collect(ctx)
 		rep.Add(name, colErr == nil, time.Since(start), data, colErr)
 	}
-
-	rep.Finish(nil)
-	return rep
 }
 
 func waitUntilFromString(s string) *playwright.WaitUntilState {
@@ -235,29 +236,13 @@ func (h *HealthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func CollectorsHandler(w http.ResponseWriter, r *http.Request) {
+	CollectorsHandlerWithRegistry(w, r, collector.DefaultRegistry())
+}
+
+func CollectorsHandlerWithRegistry(w http.ResponseWriter, r *http.Request, registry *collector.Registry) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"packages": collector.AllNames(),
-		"default":  collector.DefaultPackages,
-		"description": map[string]string{
-			"availability": "HTTP status, redirects, timing",
-			"ssl":          "Certificate, TLS, HSTS, OCSP",
-			"network":      "Request counts, sizes, slow requests",
-			"breakdown":    "JS/CSS/Image/Font/XHR breakdown",
-			"assets":       "Largest asset, page size",
-			"domains":      "Unique & third-party domains",
-			"failures":     "Broken JS/CSS/images/APIs",
-			"console":      "Console error/warning counts",
-			"exceptions":   "JS exceptions by type",
-			"security":     "Security headers + mixed content",
-			"redirects":    "Redirect chain & HTTP→HTTPS",
-			"downloads":    "Download attempts & executables",
-			"malware":      "Heuristic malware indicators",
-			"page":         "Title, meta, OpenGraph",
-			"seo":          "robots.txt, sitemap, noindex",
-			"tech":         "CMS, framework, analytics, CDN",
-			"performance":  "Size percentiles, slowest request",
-			"resources":    "Counts by resource type",
-			"thirdparty":   "Third-party size & failures",
-		},
+		"packages":    registry.Names(),
+		"default":     collector.DefaultPackages,
+		"description": registry.Descriptions(),
 	})
 }

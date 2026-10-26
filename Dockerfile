@@ -32,7 +32,6 @@ COPY --from=builder /out/monitor-server /app/monitor-server
 ENV LISTEN_ADDR=:8080
 ENV HEADLESS=true
 ENV DEFAULT_TIMEOUT=30s
-ENV MAX_CONCURRENT=4
 ENV PLAYWRIGHT_BROWSERS_PATH=/app/playwright
 
 EXPOSE 8080

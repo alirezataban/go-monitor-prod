@@ -18,20 +18,20 @@ type Manager struct {
 	pw      *playwright.Playwright
 	browser playwright.Browser
 	mu      sync.Mutex
-	sem     chan struct{} // concurrency limiter
 	ready   bool
 }
 
 func NewManager(cfg *config.Config) *Manager {
-	return &Manager{
-		cfg: cfg,
-		sem: make(chan struct{}, cfg.MaxConcurrent),
-	}
+	return &Manager{cfg: cfg}
 }
 
 func (m *Manager) Start() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	if m.ready {
+		return nil
+	}
 
 	pw, err := playwright.Run()
 	if err != nil {
@@ -71,6 +71,7 @@ func (m *Manager) Start() error {
 	browser, err := pw.Chromium.Launch(opts)
 	if err != nil {
 		_ = pw.Stop()
+		m.pw = nil
 		return fmt.Errorf("launch browser: %w", err)
 	}
 	m.browser = browser
@@ -105,39 +106,30 @@ func (m *Manager) Ready() bool {
 type Session struct {
 	Context playwright.BrowserContext
 	Page    playwright.Page
-	mgr     *Manager
+	close   sync.Once
 }
 
 func (s *Session) Close() {
-	if s.Page != nil {
-		_ = s.Page.Close()
-	}
-	if s.Context != nil {
-		_ = s.Context.Close()
-	}
-	// release concurrency slot
-	select {
-	case <-s.mgr.sem:
-	default:
-	}
+	s.close.Do(func() {
+		if s.Page != nil {
+			_ = s.Page.Close()
+		}
+		if s.Context != nil {
+			_ = s.Context.Close()
+		}
+	})
 }
 
 // NewSession creates a completely fresh context (no shared cookies, cache, storage).
 func (m *Manager) NewSession(timeout time.Duration, userAgent string, ignoreHTTPS bool, vw, vh int) (*Session, error) {
-	if !m.Ready() {
+	// Serialize browser/context creation with Stop. Once the context is created,
+	// the request can navigate independently of other sessions.
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !m.ready || m.browser == nil {
 		return nil, fmt.Errorf("browser not ready")
 	}
-
-	// limit concurrent sessions
-	select {
-	case m.sem <- struct{}{}:
-	case <-time.After(timeout):
-		return nil, fmt.Errorf("too many concurrent checks (max %d)", m.cfg.MaxConcurrent)
-	}
-
-	m.mu.Lock()
 	browser := m.browser
-	m.mu.Unlock()
 
 	if userAgent == "" {
 		userAgent = m.cfg.UserAgent
@@ -163,7 +155,6 @@ func (m *Manager) NewSession(timeout time.Duration, userAgent string, ignoreHTTP
 
 	context, err := browser.NewContext(ctxOpts)
 	if err != nil {
-		<-m.sem
 		return nil, fmt.Errorf("new context: %w", err)
 	}
 
@@ -173,7 +164,6 @@ func (m *Manager) NewSession(timeout time.Duration, userAgent string, ignoreHTTP
 	page, err := context.NewPage()
 	if err != nil {
 		_ = context.Close()
-		<-m.sem
 		return nil, fmt.Errorf("new page: %w", err)
 	}
 
@@ -183,6 +173,5 @@ func (m *Manager) NewSession(timeout time.Duration, userAgent string, ignoreHTTP
 	return &Session{
 		Context: context,
 		Page:    page,
-		mgr:     m,
 	}, nil
 }

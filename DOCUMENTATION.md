@@ -37,7 +37,7 @@
 |-----|--------|
 | Browser مشترک | یک instance برای کل عمر سرویس |
 | Context تازه | هر چک ایزوله است؛ کش و کوکی و Storage بین چک‌ها منتقل نمی‌شود |
-| محدودیت همزمانی | حداکثر تعداد چک موازی قابل تنظیم است |
+| همزمانی درخواست‌ها | بدون سقف برنامه‌ای؛ هر چک Context مستقل دارد |
 | پکیج‌محور | فقط پکیج‌های لازم اجرا می‌شوند |
 
 ---
@@ -71,7 +71,6 @@ go build -o monitor-server ./cmd/server
 ```bash
 docker build -f Dockerfile.simple -t monitor-engine-go .
 docker run --rm -p 8080:8080 --shm-size=256m \
-  -e MAX_CONCURRENT=4 \
   -e DEFAULT_TIMEOUT=30s \
   monitor-engine-go
 ```
@@ -90,7 +89,7 @@ docker run --rm -p 8080:8080 --shm-size=256m \
 | `HEADLESS` | `true` | اجرای مرورگر بدون UI |
 | `CHROME_PATH` | *(خالی)* | مسیر اجرایی Chrome/Chromium سیستم (اختیاری) |
 | `DEFAULT_TIMEOUT` | `30s` | تایم‌اوت پیش‌فرض هر چک (مثلاً `25s`، `1m`) |
-| `MAX_CONCURRENT` | `4` | حداکثر تعداد چک همزمان |
+| `MAX_CONCURRENT` | — | منسوخ است و نادیده گرفته می‌شود؛ درخواست‌ها سقف همزمانی برنامه‌ای ندارند |
 | `USER_AGENT` | `MonitorEngine-Go/2.0` | User-Agent پیش‌فرض مرورگر |
 
 ### مثال
@@ -98,7 +97,6 @@ docker run --rm -p 8080:8080 --shm-size=256m \
 ```bash
 export LISTEN_ADDR=:9090
 export DEFAULT_TIMEOUT=45s
-export MAX_CONCURRENT=2
 export CHROME_PATH=/usr/bin/google-chrome
 export HEADLESS=true
 ./monitor-server
@@ -559,7 +557,7 @@ curl "http://localhost:8080/monitor?url=https://example.com&wait=networkidle&pac
 
 ## ۹. محدودیت‌ها و نکات عملی
 
-1. **مصرف حافظه:** هر Context جدا است؛ با `MAX_CONCURRENT` تعداد موازی را محدود کنید.
+1. **مصرف حافظه:** هر درخواست Context جداگانه می‌سازد و سقف همزمانی برنامه‌ای ندارد؛ نرخ ورودی را در زیرساخت یا reverse proxy کنترل کنید.
 2. **بدون کش بین چک‌ها:** عمداً Context تازه ساخته می‌شود تا نتیجه شبیه «اولین بازدید» باشد.
 3. **timeout حداکثر ۱۲۰ ثانیه** در سطح درخواست API.
 4. **`malware` فقط heuristic** است؛ برای امنیت سازمانی به ابزار تخصصی نیاز دارید.
@@ -576,7 +574,7 @@ curl "http://localhost:8080/monitor?url=https://example.com&wait=networkidle&pac
 | `browser not ready` | لاگ استارت سرویس؛ نصب بودن Chromium Playwright |
 | تایم‌اوت زیاد | `timeout` درخواست و `DEFAULT_TIMEOUT` |
 | خطای SSL در مرورگر | `insecure=true` (فقط برای تست) |
-| تعداد زیاد fail همزمان | کاهش `MAX_CONCURRENT` |
+| مصرف زیاد منابع زیر بار | نرخ درخواست‌های همزمان را در زیرساخت کنترل کنید |
 | پاسخ خالی / 503 | `GET /health` |
 
 ---

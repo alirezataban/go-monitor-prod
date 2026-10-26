@@ -1,6 +1,5 @@
 package collector
 
-
 type Assets struct{}
 
 func (c *Assets) Name() string { return "assets" }
@@ -18,10 +17,11 @@ func (c *Assets) Collect(ctx *Context) (interface{}, error) {
 
 	var total int64
 	var largest *ResourceEntry
-	over1MB, over500KB := 0, 0
+	over1MB, over500KB, over300KB, over100KB := 0, 0, 0, 0
 	sizes := make([]int64, 0, len(resources))
 
 	for _, r := range resources {
+
 		total += r.TransferSize
 		sizes = append(sizes, r.TransferSize)
 		if largest == nil || r.TransferSize > largest.TransferSize {
@@ -33,6 +33,13 @@ func (c *Assets) Collect(ctx *Context) (interface{}, error) {
 		if r.TransferSize > 500*1024 {
 			over500KB++
 		}
+		if r.TransferSize > 300*1024 {
+			over300KB++
+		}
+		if r.TransferSize > 100*1024 {
+			over100KB++
+		}
+		
 	}
 
 	avg := int64(0)
@@ -46,6 +53,8 @@ func (c *Assets) Collect(ctx *Context) (interface{}, error) {
 		"numberOfAssets":      len(resources),
 		"numberOfAssetsOver1MB":  over1MB,
 		"numberOfAssetsOver500KB": over500KB,
+		"numberOfAssetsOver300KB": over300KB,
+		"numberOfAssetsOver100KB": over100KB,
 	}
 	if largest != nil {
 		out["largestAssetName"] = baseName(largest.URL)

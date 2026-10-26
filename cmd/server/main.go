@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/alirezataban/monitor-engine-go/internal/browser"
+	"github.com/alirezataban/monitor-engine-go/internal/collector"
 	"github.com/alirezataban/monitor-engine-go/internal/config"
 	"github.com/alirezataban/monitor-engine-go/internal/handler"
 )
@@ -23,10 +24,13 @@ func main() {
 	}
 	defer mgr.Stop()
 
+	registry := collector.DefaultRegistry()
 	mux := http.NewServeMux()
-	mux.Handle("/monitor", handler.NewMonitorHandler(mgr, cfg))
+	mux.Handle("/monitor", handler.NewMonitorHandlerWithRegistry(mgr, cfg, registry))
 	mux.Handle("/health", handler.NewHealthHandler(mgr))
-	mux.HandleFunc("/collectors", handler.CollectorsHandler)
+	mux.HandleFunc("/collectors", func(w http.ResponseWriter, r *http.Request) {
+		handler.CollectorsHandlerWithRegistry(w, r, registry)
+	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)

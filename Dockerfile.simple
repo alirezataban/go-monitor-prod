@@ -22,7 +22,6 @@ RUN go run github.com/mxschmitt/playwright-go/cmd/playwright@v0.6100.0 install -
 ENV LISTEN_ADDR=:8080
 ENV HEADLESS=true
 ENV DEFAULT_TIMEOUT=30s
-ENV MAX_CONCURRENT=4
 
 EXPOSE 8080
 ENTRYPOINT ["/app/monitor-server"]
