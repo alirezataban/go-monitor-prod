@@ -53,18 +53,30 @@ go build -o monitor-server ./cmd/server
 ./monitor-server
 ```
 
+`BROWSER_WS_ENDPOINT` can point to a remote Playwright browser server. When it
+is empty, the service launches a local Chromium browser as before.
+
 ### Docker
 
+The Go service and Playwright browser run in separate containers. The app uses
+`BROWSER_WS_ENDPOINT` to connect to the browser service. Build and start both:
+
 ```bash
-docker build -f Dockerfile.simple -t monitor-engine-go .
-docker run --rm -p 8080:8080 --shm-size=256m monitor-engine-go
+docker compose up --build
 ```
+
+The browser websocket address defaults to `ws://browser:3000/` in Compose. To
+connect the Go app to a browser service at another address, set
+`BROWSER_WS_ENDPOINT` on the app container to that service's Playwright
+websocket endpoint. Keep the browser endpoint on a trusted private network; it
+provides remote control of the browser.
 
 ### متغیرهای محیطی
 
 | متغیر | پیش‌فرض |
 |-------|---------|
 | `LISTEN_ADDR` | `:8080` |
+| `BROWSER_WS_ENDPOINT` | *(empty; launch a local browser)* |
 | `HEADLESS` | `true` |
 | `DEFAULT_TIMEOUT` | `30s` |
 | `MAX_CONCURRENT` | *(منسوخ؛ نادیده گرفته می‌شود)* |

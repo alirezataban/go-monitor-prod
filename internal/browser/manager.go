@@ -39,6 +39,19 @@ func (m *Manager) Start() error {
 	}
 	m.pw = pw
 
+	if m.cfg.BrowserEndpoint != "" {
+		browser, err := pw.Chromium.Connect(m.cfg.BrowserEndpoint)
+		if err != nil {
+			_ = pw.Stop()
+			m.pw = nil
+			return fmt.Errorf("connect browser at %s: %w", m.cfg.BrowserEndpoint, err)
+		}
+		m.browser = browser
+		m.ready = true
+		log.Printf("[browser] connected to remote browser at %s", m.cfg.BrowserEndpoint)
+		return nil
+	}
+
 	opts := playwright.BrowserTypeLaunchOptions{
 		Headless: playwright.Bool(m.cfg.Headless),
 		Args: []string{

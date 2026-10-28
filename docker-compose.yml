@@ -1,0 +1,30 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    environment:
+      LISTEN_ADDR: ":8080"
+      DEFAULT_TIMEOUT: "30s"
+      BROWSER_WS_ENDPOINT: "ws://browser:3000/"
+    ports:
+      - "8080:8080"
+    depends_on:
+      browser:
+        condition: service_healthy
+
+  browser:
+    build:
+      context: .
+      dockerfile: Dockerfile.browser
+    shm_size: 256mb
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "const s=require('net').connect(3000,'127.0.0.1');s.on('connect',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s

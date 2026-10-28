@@ -7,20 +7,22 @@ import (
 )
 
 type Config struct {
-	ListenAddr     string
-	ChromePath     string
-	Headless       bool
-	DefaultTimeout time.Duration
-	UserAgent      string
+	ListenAddr      string
+	ChromePath      string
+	BrowserEndpoint string
+	Headless        bool
+	DefaultTimeout  time.Duration
+	UserAgent       string
 }
 
 func Load() *Config {
 	cfg := &Config{
-		ListenAddr:     getEnv("LISTEN_ADDR", ":8080"),
-		ChromePath:     getEnv("CHROME_PATH", ""),
-		Headless:       getEnvBool("HEADLESS", true),
-		DefaultTimeout: getEnvDuration("DEFAULT_TIMEOUT", 30*time.Second),
-		UserAgent:      getEnv("USER_AGENT", "MonitorEngine-Go/2.0"),
+		ListenAddr:      getEnv("LISTEN_ADDR", ":8080"),
+		ChromePath:      getEnv("CHROME_PATH", ""),
+		BrowserEndpoint: getEnv("BROWSER_WS_ENDPOINT", ""),
+		Headless:        getEnvBool("HEADLESS", true),
+		DefaultTimeout:  getEnvDuration("DEFAULT_TIMEOUT", 30*time.Second),
+		UserAgent:       getEnv("USER_AGENT", "MonitorEngine-Go/2.0"),
 	}
 	return cfg
 }

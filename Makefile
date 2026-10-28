@@ -12,10 +12,13 @@ run: build
 	./$(BINARY)
 
 docker:
-	docker build -f Dockerfile.simple -t monitor-engine-go:latest .
+	docker compose build
 
 docker-run:
-	docker run --rm -p 8080:8080 --shm-size=256m monitor-engine-go:latest
+	docker compose up
+
+docker-down:
+	docker compose down
 
 clean:
 	rm -f $(BINARY)
