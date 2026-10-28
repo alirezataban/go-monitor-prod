@@ -147,9 +147,6 @@ func (h *MonitorHandler) run(req *MonitorRequest) *report.Report {
 	})
 	if err != nil {
 		fatalErr := navigationError(err)
-		// still run packages that don't need a successful page load
-		ctx := &collector.Context{Page: page, Response: nil, URL: req.URL, Tracker: tracker}
-		h.collect(rep, ctx, req.Collectors, map[string]bool{"ssl": true, "seo": true})
 		rep.Finish(fatalErr)
 		return rep
 	}

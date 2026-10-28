@@ -159,13 +159,17 @@ func assertSummaryError(t *testing.T, rep *report.Report, want string) {
 	rec := httptest.NewRecorder()
 	writeJSON(rec, http.StatusOK, rep)
 	var got struct {
-		Summary report.Summary `json:"summary"`
+		Summary    report.Summary             `json:"summary"`
+		Collectors map[string]json.RawMessage `json:"collectors"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatalf("response is invalid JSON: %v", err)
 	}
 	if got.Summary.Error != want {
 		t.Errorf("summary.error = %q, want %q", got.Summary.Error, want)
+	}
+	if len(got.Collectors) != 0 {
+		t.Errorf("collectors = %v, want no collector results", got.Collectors)
 	}
 }
 
