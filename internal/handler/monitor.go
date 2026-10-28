@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -145,7 +146,7 @@ func (h *MonitorHandler) run(req *MonitorRequest) *report.Report {
 		Timeout:   playwright.Float(float64(timeout.Milliseconds())),
 	})
 	if err != nil {
-		fatalErr := fmt.Errorf("navigation: %w", err)
+		fatalErr := navigationError(err)
 		// still run packages that don't need a successful page load
 		ctx := &collector.Context{Page: page, Response: nil, URL: req.URL, Tracker: tracker}
 		h.collect(rep, ctx, req.Collectors, map[string]bool{"ssl": true, "seo": true})
@@ -167,6 +168,16 @@ func (h *MonitorHandler) run(req *MonitorRequest) *report.Report {
 
 	rep.Finish(nil)
 	return rep
+}
+
+func navigationError(err error) error {
+	if errors.Is(err, playwright.ErrTimeout) {
+		return errors.New("Site timed out")
+	}
+	if strings.Contains(strings.ToUpper(err.Error()), "CONNECTION_REFUSED") {
+		return errors.New("Connection refused")
+	}
+	return fmt.Errorf("navigation: %w", err)
 }
 
 func (h *MonitorHandler) collect(rep *report.Report, ctx *collector.Context, names []string, allowed map[string]bool) {

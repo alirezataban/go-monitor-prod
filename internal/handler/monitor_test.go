@@ -2,6 +2,8 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +13,7 @@ import (
 	"github.com/alirezataban/monitor-engine-go/internal/collector"
 	"github.com/alirezataban/monitor-engine-go/internal/config"
 	"github.com/alirezataban/monitor-engine-go/internal/report"
+	"github.com/mxschmitt/playwright-go"
 )
 
 func TestParseRequestJSONAndQueryPrecedence(t *testing.T) {
@@ -134,5 +137,41 @@ func TestReportResponseContract(t *testing.T) {
 	}
 	if len(got) != 3 {
 		t.Errorf("response has %d top-level keys, want 3", len(got))
+	}
+}
+
+func TestNavigationTimeoutUsesStableJSONError(t *testing.T) {
+	rep := report.New("https://example.com")
+	rep.Finish(navigationError(fmt.Errorf("goto: %w", playwright.ErrTimeout)))
+
+	assertSummaryError(t, rep, "Site timed out")
+}
+
+func TestConnectionRefusedUsesStableJSONError(t *testing.T) {
+	rep := report.New("https://example.com")
+	rep.Finish(navigationError(errors.New("net::ERR_CONNECTION_REFUSED")))
+
+	assertSummaryError(t, rep, "Connection refused")
+}
+
+func assertSummaryError(t *testing.T, rep *report.Report, want string) {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	writeJSON(rec, http.StatusOK, rep)
+	var got struct {
+		Summary report.Summary `json:"summary"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("response is invalid JSON: %v", err)
+	}
+	if got.Summary.Error != want {
+		t.Errorf("summary.error = %q, want %q", got.Summary.Error, want)
+	}
+}
+
+func TestNavigationErrorPreservesNonTimeoutDetails(t *testing.T) {
+	err := navigationError(errors.New("connection reset"))
+	if got, want := err.Error(), "navigation: connection reset"; got != want {
+		t.Errorf("navigationError() = %q, want %q", got, want)
 	}
 }
