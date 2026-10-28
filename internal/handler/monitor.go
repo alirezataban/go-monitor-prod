@@ -174,6 +174,9 @@ func navigationError(err error) error {
 	if strings.Contains(strings.ToUpper(err.Error()), "CONNECTION_REFUSED") {
 		return errors.New("Connection refused")
 	}
+	if strings.Contains(strings.ToUpper(err.Error()), "ERR_NAME_NOT_RESOLVED") {
+		return errors.New("Site name could not be resolved")
+	}
 	return fmt.Errorf("navigation: %w", err)
 }
 

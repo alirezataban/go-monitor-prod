@@ -154,6 +154,13 @@ func TestConnectionRefusedUsesStableJSONError(t *testing.T) {
 	assertSummaryError(t, rep, "Connection refused")
 }
 
+func TestNameNotResolvedUsesStableJSONError(t *testing.T) {
+	rep := report.New("https://example.com")
+	rep.Finish(navigationError(errors.New("net::ERR_NAME_NOT_RESOLVED")))
+
+	assertSummaryError(t, rep, "Site name could not be resolved")
+}
+
 func assertSummaryError(t *testing.T, rep *report.Report, want string) {
 	t.Helper()
 	rec := httptest.NewRecorder()
